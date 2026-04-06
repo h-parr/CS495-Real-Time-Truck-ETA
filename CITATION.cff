@@ -3,10 +3,8 @@ message: "If you use this software, please cite it as below."
 authors:
 - family-names: "Parr"
   given-names: "Harri"
-  orcid: "https://orcid.org/0000-0000-0000-0000"
 title: "CS495-Lucky-Parrot"
 date-released: 2026-04-06
 version: 1.0.0
 license: MIT
-doi: 10.5281/zenodo.1234
 url: "https://github.com/h-parr/CS495-Lucky-Parrot"
