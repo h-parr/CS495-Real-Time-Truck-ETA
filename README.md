@@ -7,9 +7,13 @@ Using telematics to build a real-time model and streaming service to predict fin
 # Objectives
 
 • Stop Clustering: Build stop database from historical trips using DBSCAN/HDBSCAN on final GPS points
+
 • Destination Classifier: Train over candidate stops with streaming telematics features
+
 • ETA Model: Quantile regression (P10/P50/P90) conditioned on top-k predicted destinations
+
 • Streaming Inference: Real-time state per (VIN, TripId) with continuous updates at each telemetry point
+
 • Backtesting: Replay historical trip streams, evaluate stability smoothing, and ablation study
 
 # Tools / Technologies
