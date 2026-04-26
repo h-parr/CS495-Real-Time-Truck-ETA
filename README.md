@@ -1,20 +1,31 @@
-# CS495 - Real Time Prediction of Vehicle Final Stop and ETA 
+# CS495 - Real Time Prediction of Vehicle ETA
 
 # Project Description
 
-Using telematics to build a real-time model and streaming service to predict final stop locations, final timestamps, and uncertainty.
+Using telematics to build a real-time model and streaming service to predict estimated time of arrival (ETA) and uncertainty.
 
 # Objectives
 
-• Stop Clustering: Build stop database from historical trips using DBSCAN/HDBSCAN on final GPS points
-
-• Destination Classifier: Train over candidate stops with streaming telematics features
-
-• ETA Model: Quantile regression (P10/P50/P90) conditioned on top-k predicted destinations
+• ETA Model: Quantile regression (P10/P50/P90) to predict estimated time of arrival
 
 • Streaming Inference: Real-time state per (VIN, TripId) with continuous updates at each telemetry point
 
 • Backtesting: Replay historical trip streams, evaluate stability smoothing, and ablation study
+
+# Dataset
+
+The `sample_trucks_dataset.csv` file contains real-time telematics records used for model training and evaluation. Each row represents a single telemetry ping from a truck. The tracked variables are described below:
+
+| Variable | Description |
+|---|---|
+| `VIN` | Unique identifier for each truck (Vehicle Identification Number / Truck ID) |
+| `Timestamp` | Date and time of the telemetry ping, used to compute elapsed trip time and derive time-of-day features |
+| `Latitude` | GPS latitude coordinate of the truck at the time of the ping |
+| `Longitude` | GPS longitude coordinate of the truck at the time of the ping |
+| `Speed` | Instantaneous speed of the truck (mph) at the time of the ping |
+| `Weight_lbs` | Reported payload weight of the truck in pounds at the time of the ping |
+| `Device_Type` | Type of telematics device installed on the truck (e.g., OEM) |
+| `Source` | Manufacturer or data source of the telematics device (e.g., Volvo) |
 
 # Tools / Technologies
 
@@ -27,13 +38,9 @@ TBD
 # Timeline
 
 Minimal implementation roadmap (8–10 weeks)
-Build historical trip table → derive final stop points
+Build historical trip table → derive trip features
 
-Cluster final stops into stop IDs (DBSCAN/HDBSCAN)
-
-Train destination classifier (LightGBM/CatBoost)
-
-Train ETA quantile regressor conditioned on top stop(s)
+Train ETA quantile regressor (P10/P50/P90)
 
 Build streaming feature state + inference loop
 
