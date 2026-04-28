@@ -189,7 +189,7 @@ def run_audit(csv_path: str) -> None:
 if __name__ == "__main__":
     import argparse
 
-    _default_csv = str(Path(__file__).parent / "sample_trucks_dataset.csv")
+    _default_csv = str(Path(__file__).resolve().parents[1] / "data" / "sample_trucks_dataset.csv")
 
     parser = argparse.ArgumentParser(description="Run data quality audit on truck telemetry CSV.")
     parser.add_argument("--input", default=_default_csv, help="Path to source CSV")

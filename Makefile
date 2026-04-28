@@ -50,15 +50,15 @@ install-dev: install  ## Install dependencies + dev/test extras
 
 .PHONY: audit
 audit: venv  ## Run the data audit script
-	$(VENV_PYTHON) data_audit.py
+	$(VENV_PYTHON) src/data_audit.py --input data/sample_trucks_dataset.csv
 
 .PHONY: segment
 segment: venv  ## Run trip segmentation
-	$(VENV_PYTHON) trip_segmentation.py
+	$(VENV_PYTHON) src/trip_segmentation.py
 
 .PHONY: train
 train: venv  ## Train the ETA model
-	$(VENV_PYTHON) eta_model.py
+	$(VENV_PYTHON) src/eta_model.py
 
 .PHONY: test
 test: venv  ## Run tests with pytest
