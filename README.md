@@ -19,7 +19,7 @@ Using telematics to build a real-time model and streaming service to predict est
 
 # Dataset
 
-The `sample_trucks_dataset.csv` file contains real-time telematics records used for model training and evaluation. Each row represents a single telemetry ping from a truck. The tracked variables are described below:
+The `data/sample_trucks_dataset.csv` file contains real-time telematics records used for model training and evaluation. Each row represents a single telemetry ping from a truck. The tracked variables are described below:
 
 | Variable | Description |
 |---|---|

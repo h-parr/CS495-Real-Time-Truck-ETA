@@ -135,9 +135,9 @@ pip install -r requirements.txt
 ### Makefile Alternative (Windows — no Make installed)
 
 ```powershell
-python data_audit.py
-python trip_segmentation.py
-python eta_model.py
+python src/data_audit.py --input data/sample_trucks_dataset.csv
+python src/trip_segmentation.py
+python src/eta_model.py
 python -m pytest tests/
 python -m ruff check .
 ```
@@ -150,13 +150,15 @@ python -m ruff check .
 
 ```
 CS495-Real-Time-Truck-ETA/
-├── data_audit.py              # read-only data quality check
-├── trip_segmentation.py       # split raw pings into discrete trips
-├── features.py                # feature engineering (shared by train + inference)
-├── eta_model.py               # model training, inference, and persistence
-├── metrics.py                 # MAE, RMSE, quantile loss, coverage evaluation
-├── sample_trucks_dataset.csv  # raw telematics pings (Git LFS)
-├── segmented_trips.csv        # output of trip_segmentation.py (Git LFS)
+├── src/
+│   ├── data_audit.py          # read-only data quality check
+│   ├── trip_segmentation.py   # split raw pings into discrete trips
+│   ├── features.py            # feature engineering (shared by train + inference)
+│   ├── eta_model.py           # model training, inference, and persistence
+│   └── metrics.py             # MAE, RMSE, quantile loss, coverage evaluation
+├── data/
+│   ├── sample_trucks_dataset.csv  # raw telematics pings (Git LFS)
+│   └── segmented_trips.csv        # output of trip_segmentation.py (Git LFS)
 ├── requirements.txt           # pip dependencies
 ├── Makefile                   # cross-platform build and run commands
 ├── PLAN.md                    # this file
@@ -169,19 +171,19 @@ CS495-Real-Time-Truck-ETA/
 raw telemetry CSV
        │
        ▼
- data_audit.py          ← read-only quality check
+ src/data_audit.py      ← read-only quality check
        │
        ▼
- trip_segmentation.py   ← split pings → trips → segmented_trips.csv
+ src/trip_segmentation.py   ← split pings → trips → data/segmented_trips.csv
        │
        ▼
- features.py            ← transform trip rows → model-ready feature vectors
+ src/features.py        ← transform trip rows → model-ready feature vectors
        │
        ▼
- eta_model.py           ← train / load quantile regressor, run inference
+ src/eta_model.py       ← train / load quantile regressor, run inference
        │
        ▼
- metrics.py             ← evaluate MAE / RMSE / quantile loss / coverage
+ src/metrics.py         ← evaluate MAE / RMSE / quantile loss / coverage
        │
        ▼
  streaming loop         ← stateful per-(VIN, TripId) live prediction
@@ -302,7 +304,7 @@ Since `Weight_lbs` is sparse and event-driven (not present on every ping), a cha
 
 ### Primary Dataset
 
-`sample_trucks_dataset.csv` — raw telematics pings (tracked via Git LFS)
+`data/sample_trucks_dataset.csv` — raw telematics pings (tracked via Git LFS)
 
 | Column | Type | Notes |
 |---|---|---|
@@ -317,7 +319,7 @@ Since `Weight_lbs` is sparse and event-driven (not present on every ping), a cha
 
 ### Derived Dataset
 
-`segmented_trips.csv` — output of `trip_segmentation.py`, adds `TripId` and trip boundary markers to each ping.
+`data/segmented_trips.csv` — output of `src/trip_segmentation.py`, adds `TripId` and trip boundary markers to each ping.
 
 ### Labels
 
