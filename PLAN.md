@@ -14,7 +14,7 @@
 
 ### Description
 
-A machine learning pipeline that ingests raw GPS/telematics pings from commercial trucks, segments them into discrete trips, engineers time and movement features, and trains a quantile regression model to predict estimated time of arrival (ETA) with uncertainty bounds (P10/P50/P90). Predictions update continuously at every new telemetry ping per truck.
+A machine learning pipeline that ingests raw **GPS/telematics** pings from commercial trucks, segments them into discrete trips, engineers time and movement features, and trains a quantile regression model to predict **estimated time of arrival (ETA)** with uncertainty bounds (P10/P50/P90). Predictions update continuously at every new telemetry ping per truck.
 
 ### Objectives
 
