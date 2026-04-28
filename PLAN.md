@@ -43,6 +43,7 @@ pandas>=2.2
 scikit-learn>=1.5
 xgboost>=2.1
 lightgbm>=4.4
+ruptures>=1.1
 matplotlib>=3.9
 seaborn>=0.13
 joblib>=1.4
@@ -53,7 +54,7 @@ Dev extras (installed by `make install-dev`): `pytest`, `pytest-cov`, `ruff`
 
 ---
 
-### Quick Start (macOS / Linux)
+### Quick Start (macOS)
 
 ```bash
 git clone https://github.com/h-parr/CS495-Real-Time-Truck-ETA.git
@@ -66,6 +67,30 @@ make test             # verify everything works
 Or manually without Make:
 
 ```bash
+brew install python@3.13   # if not already installed
+python3.13 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+---
+
+### Quick Start (Linux)
+
+```bash
+git clone https://github.com/h-parr/CS495-Real-Time-Truck-ETA.git
+cd CS495-Real-Time-Truck-ETA
+make install
+source .venv/bin/activate
+make test
+```
+
+Or manually without Make:
+
+```bash
+# Ubuntu / Debian
+sudo apt update && sudo apt install python3.13 python3.13-venv make -y
 python3.13 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
@@ -87,6 +112,7 @@ make test
 Or manually without Make:
 
 ```powershell
+# Install Python 3.13 from https://www.python.org/downloads/
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install --upgrade pip
@@ -155,10 +181,10 @@ raw telemetry CSV
 
 ## Tasks & Milestones
 
-### Phase 1 — Data Foundation ✅
+### Phase 1 — Data Foundation 🔄
 - [x] Write `data_audit.py` — missingness, duplicates, out-of-order pings, per-VIN counts
-- [x] Write `trip_segmentation.py` — detect trip boundaries using time gaps and speed
-- [x] Produce `segmented_trips.csv` — cleaned, trip-labeled dataset
+- [ ] Write `trip_segmentation.py` — detect trip boundaries using time gaps and speed
+- [ ] Produce `segmented_trips.csv` — cleaned, trip-labeled dataset
 
 ### Phase 2 — Feature Engineering 🔄
 - [ ] Implement feature transforms in `features.py`
@@ -169,6 +195,16 @@ raw telemetry CSV
   - [ ] Day-of-week encoding
   - [ ] Payload weight flag (sparse feature — present vs absent)
 - [ ] Write unit tests for all feature transforms
+
+### Phase 2b — Load State Detection (Change Point Detection) 🔲
+- [ ] Create `load_state.py` — change point detection module
+  - [ ] Apply PELT algorithm (via `ruptures`) to per-trip speed signal to detect load/unload events
+  - [ ] Use `Weight_lbs` readings (where available) as ground-truth labels to validate detected change points
+  - [ ] Emit a `LoadState` label per ping: `loaded`, `unloaded`, or `unknown`
+  - [ ] Derive `load_change_count` feature (number of state transitions per trip)
+  - [ ] Add `LoadState` and `load_change_count` as features in `features.py`
+- [ ] Evaluate CPD accuracy against known weight events
+- [ ] Write unit tests for change point detection edge cases (flat signal, single ping, no weight data)
 
 ### Phase 3 — Modeling 🔲
 - [ ] Train/validation/test split (trip-level, not row-level, to prevent leakage)
@@ -209,7 +245,19 @@ raw telemetry CSV
 - `pandas` for data loading and manipulation
 - `pyarrow` for fast CSV / parquet I/O
 - Custom trip segmentation using time-gap and speed thresholds
+- `ruptures` for PELT change point detection (load state inference)
 - `scikit-learn` preprocessing: `StandardScaler`, `OrdinalEncoder`
+
+### Load State Detection
+
+Since `Weight_lbs` is sparse and event-driven (not present on every ping), a change point detection (CPD) algorithm is used to infer truck load state from the speed signal instead.
+
+- **Algorithm:** PELT (Pruned Exact Linear Time) — detects structural breaks in a time series with optimal cost minimization
+- **Signal:** per-trip speed sequence (and optionally acceleration derived from consecutive pings)
+- **Validation:** when `Weight_lbs` readings are present, use them as ground-truth to tune the penalty parameter
+- **Output:** `LoadState` label (`loaded` / `unloaded` / `unknown`) per ping, plus `load_change_count` per trip
+- **Library:** `ruptures` (Python change point detection library)
+- **Fallback:** if speed signal is too flat or trip is too short, default to `unknown`
 
 ### Machine Learning Models
 
@@ -275,16 +323,15 @@ ETA labels are derived from the data itself: the timestamp of the final ping of 
 
 | Week | Dates | Goals |
 |---|---|---|
-| 1 | Apr 21 – Apr 27 | Data audit ✅, trip segmentation ✅, repo setup ✅ |
-| 2 | Apr 28 – May 4 | Feature engineering (`features.py`), unit tests |
-| 3 | May 5 – May 11 | Baseline model, LightGBM training, initial metrics |
-| 4 | May 12 – May 18 | XGBoost comparison, hyperparameter tuning, evaluation |
-| 5 | May 19 – May 25 | Streaming inference loop, state management tests |
-| 6 | May 26 – Jun 1 | Backtesting replay engine, stability smoothing |
-| 7 | Jun 2 – Jun 8 | Ablation study, dashboard prototype |
-| 8 | Jun 9 – Jun 15 | Dashboard polish, documentation, final README |
-| 9 | Jun 16 – Jun 22 | Buffer / stretch goals, demo prep |
-| 10 | Jun 23 – Jun 29 | Final submission and presentation |
+| 1 | Apr 21 – Apr 27 | Data audit ✅, repo setup ✅ |
+| 2 | Apr 28 – May 4 | Trip segmentation (`trip_segmentation.py`), unit tests |
+| 3 | May 5 – May 11 | Feature engineering (`features.py`), load state detection (`load_state.py` — PELT CPD) |
+| 4 | May 12 – May 18 | Validate CPD against weight readings; integrate `LoadState` into feature set |
+| 5 | May 19 – May 25 | Baseline model, LightGBM training, initial metrics |
+| 6 | May 26 – Jun 1 | XGBoost comparison, hyperparameter tuning, full evaluation |
+| 7 | Jun 2 – Jun 8 | Streaming inference loop, backtesting replay engine, state management tests |
+| 8 | Jun 9 – Jun 15 | Streamlit dashboard, stability smoothing, ablation study |
+| **Final** | **Jun 16 – Jun 17** | **Documentation polish, final README, submission ✅** |
 
 ---
 
@@ -297,4 +344,4 @@ ETA labels are derived from the data itself: the timestamp of the final ping of 
 
 ---
 
-*Last updated: 2026-04-27*
+*Last updated: 2026-04-27 — Final submission deadline: June 17, 2026*
