@@ -1,4 +1,4 @@
-# CS495 - Real Time Prediction of Vehicle ETA
+# CS495 - Real Time Truck ETA prediction
 
 # Project Description
 
