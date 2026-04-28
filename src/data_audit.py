@@ -1,7 +1,7 @@
 """Data audit module goals:
 
 - Run a read-only data quality check on the raw telemetry CSV.
-- Report missingness, validity issues, duplicate pings, and per-VIN row counts.
+- Report missingness, validity issues, duplicate pings, and per-ID row counts.
 - Identify sparse or event-driven features (e.g. Weight_lbs) so downstream code
   handles them appropriately rather than dropping rows.
 """
@@ -14,8 +14,8 @@ from datetime import datetime
 from pathlib import Path
 
 REQUIRED_COLUMNS = [
-    "VIN", "Timestamp", "Latitude", "Longitude",
-    "Speed", "Weight_lbs", "Device_Type", "Source",
+    "ID", "Timestamp", "Latitude", "Longitude",
+    "Speed", "Weight_lbs",
 ]
 
 
@@ -30,9 +30,9 @@ def run_audit(csv_path: str) -> None:
 
     rows = 0
     missing: Counter = Counter()
-    rows_per_vin: Counter = Counter()
-    weight_present_per_vin: Counter = Counter()
-    out_of_order_per_vin: Counter = Counter()
+    rows_per_id: Counter = Counter()
+    weight_present_per_id: Counter = Counter()
+    out_of_order_per_id: Counter = Counter()
 
     bad_ts = 0
     bad_lat = 0
@@ -42,7 +42,7 @@ def run_audit(csv_path: str) -> None:
     invalid_speed = 0
     adjacent_dup_pings = 0
 
-    last_ts_by_vin: dict[str, datetime] = {}
+    last_ts_by_id: dict[str, datetime] = {}
     prev_ping_key = None
 
     with open(path, "r", newline="", encoding="utf-8") as f:
@@ -61,7 +61,7 @@ def run_audit(csv_path: str) -> None:
                 if not row.get(col):
                     missing[col] += 1
 
-            vin = row.get("VIN", "")
+            vin = row.get("ID", "")
             ts_s = row.get("Timestamp", "")
             lat_s = row.get("Latitude", "")
             lon_s = row.get("Longitude", "")
@@ -69,9 +69,9 @@ def run_audit(csv_path: str) -> None:
             wt_s = row.get("Weight_lbs", "")
 
             if vin:
-                rows_per_vin[vin] += 1
+                rows_per_id[vin] += 1
             if vin and wt_s:
-                weight_present_per_vin[vin] += 1
+                weight_present_per_id[vin] += 1
 
             # Adjacent duplicate ping check
             key = (vin, ts_s, lat_s, lon_s)
@@ -79,7 +79,7 @@ def run_audit(csv_path: str) -> None:
                 adjacent_dup_pings += 1
             prev_ping_key = key
 
-            # Timestamp parse + per-VIN ordering
+            # Timestamp parse + per-ID ordering
             ts = None
             if ts_s:
                 try:
@@ -90,10 +90,10 @@ def run_audit(csv_path: str) -> None:
                 bad_ts += 1
 
             if vin and ts is not None:
-                prev_ts = last_ts_by_vin.get(vin)
+                prev_ts = last_ts_by_id.get(vin)
                 if prev_ts is not None and ts < prev_ts:
-                    out_of_order_per_vin[vin] += 1
-                last_ts_by_vin[vin] = ts
+                    out_of_order_per_id[vin] += 1
+                last_ts_by_id[vin] = ts
 
             # Coordinate range checks
             try:
@@ -123,12 +123,12 @@ def run_audit(csv_path: str) -> None:
         for c in REQUIRED_COLUMNS
     }
 
-    # Per-VIN weight coverage
+    # Per-ID weight coverage
     weight_presence = sorted(
         [
-            (vin, n, weight_present_per_vin.get(vin, 0),
-             round(weight_present_per_vin.get(vin, 0) / n * 100, 3) if n else 0.0)
-            for vin, n in rows_per_vin.items()
+            (vin, n, weight_present_per_id.get(vin, 0),
+             round(weight_present_per_id.get(vin, 0) / n * 100, 3) if n else 0.0)
+            for vin, n in rows_per_id.items()
         ],
         key=lambda x: x[3],
     )
@@ -137,7 +137,7 @@ def run_audit(csv_path: str) -> None:
     print("DATA QUALITY AUDIT")
     print("=" * 60)
     print(f"  Total rows:                   {rows:,}")
-    print(f"  VIN count:                    {len(rows_per_vin)}")
+    print(f"  ID count:                     {len(rows_per_id)}")
     print()
     print("--- Missing Columns ---")
     if missing_cols:
@@ -159,21 +159,21 @@ def run_audit(csv_path: str) -> None:
     print(f"  Negative speed rows:          {negative_speed:,}")
     print(f"  Unparseable speed rows:       {invalid_speed:,}")
     print(f"  Adjacent duplicate pings:     {adjacent_dup_pings:,}")
-    print(f"  VINs with out-of-order ts:    {len(out_of_order_per_vin)}")
+    print(f"  IDs with out-of-order ts:     {len(out_of_order_per_id)}")
     print()
-    print("--- Rows per VIN (top 10 / bottom 10) ---")
-    for vin, n in rows_per_vin.most_common(10):
+    print("--- Rows per ID (top 10 / bottom 10) ---")
+    for vin, n in rows_per_id.most_common(10):
         print(f"  {vin:<15} {n:>9,} rows")
     print("  ...")
-    for vin, n in sorted(rows_per_vin.items(), key=lambda x: x[1])[:10]:
+    for vin, n in sorted(rows_per_id.items(), key=lambda x: x[1])[:10]:
         print(f"  {vin:<15} {n:>9,} rows")
     print()
-    print("--- Weight_lbs Coverage per VIN ---")
+    print("--- Weight_lbs Coverage per ID ---")
     print(f"  (overall: {round((rows - missing['Weight_lbs']) / rows * 100, 3):.3f}% non-missing)")
-    print("  Lowest coverage VINs:")
+    print("  Lowest coverage IDs:")
     for vin, total, present, pct in weight_presence[:10]:
         print(f"    {vin:<15}  {present:>9,}/{total:>9,}  ({pct:.3f}%)")
-    print("  Highest coverage VINs:")
+    print("  Highest coverage IDs:")
     for vin, total, present, pct in reversed(weight_presence[-10:]):
         print(f"    {vin:<15}  {present:>9,}/{total:>9,}  ({pct:.3f}%)")
     print()
@@ -181,7 +181,7 @@ def run_audit(csv_path: str) -> None:
     if missing_pct["Weight_lbs"] > 10 and spread > 30:
         print("  INTERPRETATION: Weight_lbs appears event-driven or source-dependent.")
         print(f"  Coverage ranges from {weight_presence[0][3]:.2f}% to "
-              f"{weight_presence[-1][3]:.2f}% across VINs.")
+              f"{weight_presence[-1][3]:.2f}% across IDs.")
         print("  Do NOT drop rows solely because Weight_lbs is missing.")
     print("=" * 60)
 

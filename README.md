@@ -13,7 +13,7 @@ Using telematics to build a real-time model and streaming service to predict est
 
 • ETA Model: Quantile regression (P10/P50/P90) to predict estimated time of arrival
 
-• Streaming Inference: Real-time state per (VIN, TripId) with continuous updates at each telemetry point
+• Streaming Inference: Real-time state per (ID, TripId) with continuous updates at each telemetry point
 
 • Backtesting: Replay historical trip streams, evaluate stability smoothing, and ablation study
 
@@ -23,14 +23,12 @@ The `data/sample_trucks_dataset.csv` file contains real-time telematics records 
 
 | Variable | Description |
 |---|---|
-| `VIN` | Unique identifier for each truck (Vehicle Identification Number / Truck ID) |
+| `ID` | Unique identifier for each truck |
 | `Timestamp` | Date and time of the telemetry ping, used to compute elapsed trip time and derive time-of-day features |
 | `Latitude` | GPS latitude coordinate of the truck at the time of the ping |
 | `Longitude` | GPS longitude coordinate of the truck at the time of the ping |
 | `Speed` | Instantaneous speed of the truck (mph) at the time of the ping |
 | `Weight_lbs` | Reported payload weight of the truck in pounds at the time of the ping |
-| `Device_Type` | Type of telematics device installed on the truck (e.g., OEM) |
-| `Source` | Manufacturer or data source of the telematics device (e.g., Volvo) |
 
 # Tools / Technologies
 

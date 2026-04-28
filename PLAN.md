@@ -21,7 +21,7 @@ A machine learning pipeline that ingests raw **GPS/telematics** pings from comme
 - Build a quantile ETA model with MAE < 10 minutes on the P50 (median) estimate
 - Establish a strong ETA baseline using HistGradientBoostingRegressor and report relative improvement of the final model versus baseline
 - Deliver calibrated uncertainty: ≥ 80% of actual arrivals fall inside the P10–P90 interval
-- Build a streaming inference loop that updates ETA at every telemetry ping per (VIN, TripId)
+- Build a streaming inference loop that updates ETA at every telemetry ping per (ID, TripId)
 - Backtest the model on replayed historical trip streams and demonstrate stable predictions
 - Compare change point detection methods (PELT vs Binary Segmentation) for load/unload detection and select the best-performing approach
 - Deploy an interactive Streamlit dashboard showing live ETA and confidence band on a map
@@ -186,7 +186,7 @@ raw telemetry CSV
  src/metrics.py         ← evaluate MAE / RMSE / quantile loss / coverage
        │
        ▼
- streaming loop         ← stateful per-(VIN, TripId) live prediction
+ streaming loop         ← stateful per-(ID, TripId) live prediction
        │
        ▼
  Streamlit UI           ← map + ETA confidence band visualization
@@ -197,7 +197,7 @@ raw telemetry CSV
 ## Tasks & Milestones
 
 ### Phase 1 — Data Foundation 🔄
-- [x] Write `data_audit.py` — missingness, duplicates, out-of-order pings, per-VIN counts
+- [x] Write `data_audit.py` — missingness, duplicates, out-of-order pings, per-ID counts
 - [ ] Write `trip_segmentation.py` — detect trip boundaries using time gaps and speed
 - [ ] Produce `segmented_trips.csv` — cleaned, trip-labeled dataset
 
@@ -238,7 +238,7 @@ raw telemetry CSV
 - [ ] Compare model versions in `metrics.py`
 
 ### Phase 5 — Streaming Inference 🔲
-- [ ] Stateful per-(VIN, TripId) feature accumulator
+- [ ] Stateful per-(ID, TripId) feature accumulator
 - [ ] Inference loop: emit updated ETA at every new ping
 - [ ] Unit tests for state management and edge cases (short trips, GPS gaps)
 
@@ -250,7 +250,7 @@ raw telemetry CSV
 
 ### Phase 7 — Demo & Delivery 🔲
 - [ ] Build Streamlit dashboard: live map + ETA band per truck
-- [ ] Add interactive prediction form (VIN selector, trip playback)
+- [ ] Add interactive prediction form (ID selector, trip playback)
 - [ ] Final README polish, usage examples, and attribution
 - [ ] Record demo video or prepare live walkthrough
 
@@ -308,14 +308,12 @@ Since `Weight_lbs` is sparse and event-driven (not present on every ping), a cha
 
 | Column | Type | Notes |
 |---|---|---|
-| `VIN` | string | Unique truck identifier |
+| `ID` | string | Unique truck identifier |
 | `Timestamp` | datetime | Ping time — used for trip segmentation and elapsed time features |
 | `Latitude` | float | GPS latitude |
 | `Longitude` | float | GPS longitude |
 | `Speed` | float | mph at ping time |
 | `Weight_lbs` | float | Sparse / event-driven — not present on every ping |
-| `Device_Type` | string | OEM telematics device category |
-| `Source` | string | Telematics manufacturer (e.g. Volvo) |
 
 ### Derived Dataset
 
