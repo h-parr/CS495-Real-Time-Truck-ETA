@@ -31,9 +31,45 @@ The `sample_trucks_dataset.csv` file contains real-time telematics records used 
 
 Tools: Python, LightGBM/CatBoost, DBSCAN/HDBSCAN, H3/geohash spatial indexing, Scikit-learn, Streamlit
 
-# How to Run
+# Setup (Makefile Commands)
 
-TBD
+This project uses a cross-platform `Makefile` to streamline setup and common workflows on macOS/Linux and Windows (with GNU Make installed).
+
+## 1) Create and Populate the Virtual Environment
+
+```bash
+make install
+```
+
+This will:
+- create `.venv` using Python 3.13
+- upgrade `pip`
+- install packages from `requirements.txt`
+
+For development tools (pytest/coverage/ruff):
+
+```bash
+make install-dev
+```
+
+## 2) Common Commands
+
+```bash
+make help      # list all available targets
+make audit     # run data audit script
+make segment   # run trip segmentation
+make train     # run ETA model training
+make test      # run pytest suite
+make lint      # run ruff linter
+make clean     # remove venv and Python cache files
+make rebuild   # clean + install
+```
+
+## 3) Optional Maintenance Commands
+
+```bash
+make freeze    # write currently installed packages to requirements.txt
+```
 
 # Timeline
 
