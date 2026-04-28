@@ -1,5 +1,10 @@
 # CS495 - Real Time Truck ETA prediction
 
+![Python](https://img.shields.io/badge/Python-3.13-blue)
+![Machine Learning](https://img.shields.io/badge/Machine%20Learning-LightGBM-green)
+![ETA](https://img.shields.io/badge/ETA-Quantile%20Regression-orange)
+![Telematics](https://img.shields.io/badge/Telematics-Real%20Time-red)
+
 # Project Description
 
 Using telematics to build a real-time model and streaming service to predict estimated time of arrival (ETA) and uncertainty.
