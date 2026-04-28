@@ -76,6 +76,21 @@ make rebuild   # clean + install
 make freeze    # write currently installed packages to requirements.txt
 ```
 
+# Development Workflow
+
+Use a branch-based workflow instead of committing code changes directly to `main`.
+
+1. Branch from `develop` for each feature or fix.
+2. Open a Pull Request into `develop` first.
+3. Ensure CI passes (`ruff` + `pytest`).
+4. Merge to `main` only when a feature set is stable/reviewed.
+
+Suggested naming:
+
+- `feature/trip-segmentation`
+- `feature/load-state-cpd`
+- `fix/data-audit-cli`
+
 # Timeline
 
 Minimal implementation roadmap (8–10 weeks)
