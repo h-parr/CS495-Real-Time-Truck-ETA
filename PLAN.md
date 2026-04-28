@@ -19,10 +19,23 @@ A machine learning pipeline that ingests raw **GPS/telematics** pings from comme
 ### Objectives
 
 - Build a quantile ETA model with MAE < 10 minutes on the P50 (median) estimate
+- Establish a strong ETA baseline using HistGradientBoostingRegressor and report relative improvement of the final model versus baseline
 - Deliver calibrated uncertainty: ≥ 80% of actual arrivals fall inside the P10–P90 interval
 - Build a streaming inference loop that updates ETA at every telemetry ping per (VIN, TripId)
 - Backtest the model on replayed historical trip streams and demonstrate stable predictions
+- Compare change point detection methods (PELT vs Binary Segmentation) for load/unload detection and select the best-performing approach
 - Deploy an interactive Streamlit dashboard showing live ETA and confidence band on a map
+
+---
+
+## Success Criteria
+
+- ETA model performance: final P50 model MAE < 10 minutes on the held-out test set
+- Baseline comparison: final P50 model improves MAE by at least 10% vs HistGradientBoostingRegressor baseline
+- Uncertainty calibration: at least 80% of true arrivals fall inside the P10-P90 prediction interval
+- CPD comparison: choose between PELT and Binary Segmentation using better F1 score on known load/unload events
+- CPD latency: median detection lag <= 3 pings after a true load/unload event
+- Reliability: all core pipeline tests pass in pytest and lint checks pass with ruff
 
 ---
 
@@ -199,20 +212,22 @@ raw telemetry CSV
 ### Phase 2b — Load State Detection (Change Point Detection) 🔲
 - [ ] Create `load_state.py` — change point detection module
   - [ ] Apply PELT algorithm (via `ruptures`) to per-trip speed signal to detect load/unload events
+      - [ ] Apply Binary Segmentation (via `ruptures`) as a comparison CPD method on the same trips
   - [ ] Use `Weight_lbs` readings (where available) as ground-truth labels to validate detected change points
   - [ ] Emit a `LoadState` label per ping: `loaded`, `unloaded`, or `unknown`
   - [ ] Derive `load_change_count` feature (number of state transitions per trip)
   - [ ] Add `LoadState` and `load_change_count` as features in `features.py`
-- [ ] Evaluate CPD accuracy against known weight events
+- [ ] Evaluate CPD accuracy against known weight events and compare PELT vs Binary Segmentation (F1 and detection lag)
 - [ ] Write unit tests for change point detection edge cases (flat signal, single ping, no weight data)
 
 ### Phase 3 — Modeling 🔲
 - [ ] Train/validation/test split (trip-level, not row-level, to prevent leakage)
-- [ ] Implement baseline: linear regression on elapsed time
+- [ ] Implement baseline: HistGradientBoostingRegressor (primary baseline) and linear regression (sanity baseline)
 - [ ] Train LightGBM quantile regressor (P10, P50, P90)
 - [ ] Train XGBoost quantile regressor for comparison
 - [ ] Hyperparameter tuning with cross-validation (learning rate, depth, leaves)
 - [ ] Persist best model with `joblib`
+- [ ] Compare final model against baselines on MAE, RMSE, and MAPE
 
 ### Phase 4 — Evaluation 🔲
 - [ ] Compute MAE, RMSE, MAPE on P50 predictions
@@ -253,6 +268,7 @@ raw telemetry CSV
 Since `Weight_lbs` is sparse and event-driven (not present on every ping), a change point detection (CPD) algorithm is used to infer truck load state from the speed signal instead.
 
 - **Algorithm:** PELT (Pruned Exact Linear Time) — detects structural breaks in a time series with optimal cost minimization
+- **Comparison method:** Binary Segmentation (BinSeg) — faster greedy CPD baseline to benchmark against PELT
 - **Signal:** per-trip speed sequence (and optionally acceleration derived from consecutive pings)
 - **Validation:** when `Weight_lbs` readings are present, use them as ground-truth to tune the penalty parameter
 - **Output:** `LoadState` label (`loaded` / `unloaded` / `unknown`) per ping, plus `load_change_count` per trip
@@ -263,7 +279,8 @@ Since `Weight_lbs` is sparse and event-driven (not present on every ping), a cha
 
 | Model | Role | Library |
 |---|---|---|
-| Linear Regression | Baseline | scikit-learn |
+| HistGradientBoostingRegressor | Primary ETA baseline | scikit-learn |
+| Linear Regression | Sanity baseline | scikit-learn |
 | LightGBM Quantile | Primary ETA model (P10/P50/P90) | lightgbm |
 | XGBoost Quantile | Comparison model | xgboost |
 
@@ -326,8 +343,8 @@ ETA labels are derived from the data itself: the timestamp of the final ping of 
 | 1 | Apr 21 – Apr 27 | Data audit ✅, repo setup ✅ |
 | 2 | Apr 28 – May 4 | Trip segmentation (`trip_segmentation.py`), unit tests |
 | 3 | May 5 – May 11 | Feature engineering (`features.py`), load state detection (`load_state.py` — PELT CPD) |
-| 4 | May 12 – May 18 | Validate CPD against weight readings; integrate `LoadState` into feature set |
-| 5 | May 19 – May 25 | Baseline model, LightGBM training, initial metrics |
+| 4 | May 12 – May 18 | Run CPD comparison (PELT vs BinSeg), validate against weight readings; integrate `LoadState` into feature set |
+| 5 | May 19 – May 25 | Train ETA baselines (HistGradientBoosting + linear), LightGBM training, initial metrics |
 | 6 | May 26 – Jun 1 | XGBoost comparison, hyperparameter tuning, full evaluation |
 | 7 | Jun 2 – Jun 8 | Streaming inference loop, backtesting replay engine, state management tests |
 | 8 | Jun 9 – Jun 15 | Streamlit dashboard, stability smoothing, ablation study |
