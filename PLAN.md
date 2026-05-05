@@ -10,7 +10,8 @@
 **Title:** Real-Time Truck ETA Prediction  
 **Author:** Harri  
 **Course:** CS 495 — Capstone Project  
-**Date:** April 27, 2026
+**Date:** April 27, 2026  
+**Last Updated:** May 4, 2026
 
 ### Description
 
@@ -25,6 +26,7 @@ A machine learning pipeline that ingests raw **GPS/telematics** pings from comme
 - Backtest the model on replayed historical trip streams and demonstrate stable predictions
 - Compare change point detection methods (PELT vs Binary Segmentation) for load/unload detection and select the best-performing approach
 - Deploy an interactive Streamlit dashboard showing live ETA and confidence band on a map
+- Expose a REST API endpoint (FastAPI) so external logistics systems can query ETA predictions in real time
 
 ---
 
@@ -36,6 +38,7 @@ A machine learning pipeline that ingests raw **GPS/telematics** pings from comme
 - CPD comparison: choose between PELT and Binary Segmentation using better F1 score on known load/unload events
 - CPD latency: median detection lag <= 3 pings after a true load/unload event
 - Reliability: all core pipeline tests pass in pytest and lint checks pass with ruff
+- API: FastAPI endpoint returns P10/P50/P90 ETA response in < 50ms per ping
 
 ---
 
@@ -196,20 +199,21 @@ raw telemetry CSV
 
 ## Tasks & Milestones
 
-### Phase 1 — Data Foundation 🔄
+### Phase 1 — Data Foundation ✅
 - [x] Write `data_audit.py` — missingness, duplicates, out-of-order pings, per-VIN counts
-- [ ] Write `trip_segmentation.py` — detect trip boundaries using time gaps and speed
-- [ ] Produce `segmented_trips.csv` — cleaned, trip-labeled dataset
+- [x] Write `trip_segmentation.py` — detect trip boundaries using time gaps and speed
+- [x] Produce `segmented_trips.csv` — cleaned, trip-labeled dataset
 
-### Phase 2 — Feature Engineering 🔄
-- [ ] Implement feature transforms in `features.py`
-  - [ ] Elapsed trip time since first ping
-  - [ ] Speed statistics: rolling mean, rolling std, max speed so far
-  - [ ] Distance remaining (haversine to estimated destination)
-  - [ ] Time-of-day encoding (hour, sin/cos cyclical)
-  - [ ] Day-of-week encoding
-  - [ ] Payload weight flag (sparse feature — present vs absent)
-- [ ] Write unit tests for all feature transforms
+### Phase 2 — Feature Engineering ✅
+- [x] Implement feature transforms in `features.py`
+  - [x] Elapsed trip time since first ping (`elapsed_s`)
+  - [x] Speed statistics: rolling mean, rolling std, max speed so far
+  - [x] Distance remaining (haversine to estimated destination)
+  - [x] Time-of-day encoding (hour, sin/cos cyclical)
+  - [x] Day-of-week encoding
+  - [x] Payload weight flag (sparse feature — present vs absent)
+  - [x] Trip progress fraction (0→1)
+- [x] Write unit tests for all feature transforms (14 tests passing)
 
 ### Phase 2b — Load State Detection (Change Point Detection) 🔲
 - [ ] Create `load_state.py` — change point detection module
@@ -222,14 +226,30 @@ raw telemetry CSV
 - [ ] Evaluate CPD accuracy against known weight events and compare PELT vs Binary Segmentation (F1 and detection lag)
 - [ ] Write unit tests for change point detection edge cases (flat signal, single ping, no weight data)
 
-### Phase 3 — Modeling 🔲
-- [ ] Train/validation/test split (trip-level, not row-level, to prevent leakage)
-- [ ] Implement baseline: HistGradientBoostingRegressor (primary baseline) and linear regression (sanity baseline)
-- [ ] Train LightGBM quantile regressor (P10, P50, P90)
+### Phase 3 — Modeling �
+- [x] Train/validation/test split (trip-level, not row-level, to prevent leakage)
+- [x] Implement naive speed baseline (dist_remaining / speed — no training required)
+- [x] Implement HistGradientBoostingRegressor primary baseline
+- [x] Train LightGBM quantile regressor (P10, P50, P90)
+- [x] Persist models with `joblib` → `models/*.pkl`
+- [x] Three-way comparison table printed at end of training run
+- [ ] Add acceleration feature (`speed.diff()` per trip)
+- [ ] Add `trip_duration_estimate_min` feature
+- [ ] Relax early stopping to 50 rounds; increase `n_estimators` to 500
 - [ ] Train XGBoost quantile regressor for comparison
 - [ ] Hyperparameter tuning with cross-validation (learning rate, depth, leaves)
-- [ ] Persist best model with `joblib`
-- [ ] Compare final model against baselines on MAE, RMSE, and MAPE
+- [ ] Compare final model against all baselines on MAE, RMSE, and MAPE
+
+**Current results (first run — basic features only):**
+
+| Model | MAE | RMSE | Notes |
+|---|---|---|---|
+| Naive speed (no training) | 227.7 min | 1002.3 min | Physics only |
+| HistGradientBoosting | 27.9 min | 78.5 min | Primary ML baseline |
+| LightGBM P50 | 28.3 min | 100.1 min | −1.4% vs HGB; +87.6% vs naive |
+| Coverage P10–P90 | 77.1% | — | Target ≥ 80% |
+
+Root cause of LightGBM underperforming HGB: objective mismatch (pinball vs squared error) on a minimal feature set. Load-state features (Phase 2b) are the primary unlock.
 
 ### Phase 4 — Evaluation 🔲
 - [ ] Compute MAE, RMSE, MAPE on P50 predictions
@@ -237,10 +257,12 @@ raw telemetry CSV
 - [ ] Coverage check: % of actuals inside P10–P90 interval (target ≥ 80%)
 - [ ] Compare model versions in `metrics.py`
 
-### Phase 5 — Streaming Inference 🔲
-- [ ] Stateful per-(VIN, TripId) feature accumulator
+### Phase 5 — Streaming Inference & API 🔲
+- [ ] Stateful per-(VIN, TripId) feature accumulator (rolling history of last 5 pings)
 - [ ] Inference loop: emit updated ETA at every new ping
-- [ ] Unit tests for state management and edge cases (short trips, GPS gaps)
+- [ ] FastAPI REST endpoint: `POST /predict` → returns `{eta_p10, eta_p50, eta_p90, confidence_band_min}`
+- [ ] Trip state store: in-memory dict keyed by (VIN, TripId) for rolling features
+- [ ] Unit tests for state management and edge cases (short trips, GPS gaps, first ping cold start)
 
 ### Phase 6 — Backtesting & Stability 🔲
 - [ ] Replay engine: feed historical trips ping-by-ping
@@ -250,6 +272,7 @@ raw telemetry CSV
 
 ### Phase 7 — Demo & Delivery 🔲
 - [ ] Build Streamlit dashboard: live map + ETA band per truck
+- [ ] Streamlit calls FastAPI `/predict` endpoint (two-tier architecture)
 - [ ] Add interactive prediction form (VIN selector, trip playback)
 - [ ] Final README polish, usage examples, and attribution
 - [ ] Record demo video or prepare live walkthrough
@@ -281,7 +304,8 @@ Since `Weight_lbs` is sparse and event-driven (not present on every ping), a cha
 
 | Model | Role | Library |
 |---|---|---|
-| HistGradientBoostingRegressor | Primary ETA baseline | scikit-learn |
+| Naive speed (dist/speed) | Physics baseline — no training | math |
+| HistGradientBoostingRegressor | Primary ML baseline | scikit-learn |
 | Linear Regression | Sanity baseline | scikit-learn |
 | LightGBM Quantile | Primary ETA model (P10/P50/P90) | lightgbm |
 | XGBoost Quantile | Comparison model | xgboost |
@@ -297,6 +321,14 @@ Since `Weight_lbs` is sparse and event-driven (not present on every ping), a cha
 ### Visualization
 - `matplotlib` / `seaborn` — EDA and training diagnostics
 - `Streamlit` — interactive demo dashboard with map and ETA confidence band
+
+### API
+- **Framework:** FastAPI — automatic `/docs` OpenAPI UI, type-validated requests via Pydantic
+- **Endpoint:** `POST /predict` — accepts a single ping (VIN, TripId, timestamp, lat, lon, speed, weight_lbs) and returns P10/P50/P90 ETA in minutes
+- **State management:** in-memory dict keyed by `(VIN, TripId)` storing last 5 pings for rolling feature computation
+- **Model loading:** all `.pkl` files loaded once at server startup; inference is stateless per request after feature computation
+- **Target latency:** < 50ms per prediction
+- **Deployment:** Uvicorn + Docker (planned)
 
 ---
 
@@ -343,13 +375,13 @@ ETA labels are derived from the data itself: the timestamp of the final ping of 
 | Week | Dates | Goals |
 |---|---|---|
 | 1 | Apr 21 – Apr 27 | Data audit ✅, repo setup ✅ |
-| 2 | Apr 28 – May 4 | Trip segmentation (`trip_segmentation.py`), unit tests |
-| 3 | May 5 – May 11 | Feature engineering (`features.py`), load state detection (`load_state.py` — PELT CPD) |
-| 4 | May 12 – May 18 | Run CPD comparison (PELT vs BinSeg), validate against weight readings; integrate `LoadState` into feature set |
-| 5 | May 19 – May 25 | Train ETA baselines (HistGradientBoosting + linear), LightGBM training, initial metrics |
-| 6 | May 26 – Jun 1 | XGBoost comparison, hyperparameter tuning, full evaluation |
-| 7 | Jun 2 – Jun 8 | Streaming inference loop, backtesting replay engine, state management tests |
-| 8 | Jun 9 – Jun 15 | Streamlit dashboard, stability smoothing, ablation study |
+| 2 | Apr 28 – May 4 | Trip segmentation ✅, feature engineering ✅, first model run ✅, baselines ✅ |
+| 3 | May 5 – May 11 | Load state detection (`load_state.py` — PELT CPD), acceleration + trip-length features, relax early stopping |
+| 4 | May 12 – May 18 | CPD comparison (PELT vs BinSeg), validate against weight readings; integrate `LoadState` into feature set |
+| 5 | May 19 – May 25 | XGBoost comparison, hyperparameter tuning, full evaluation; FastAPI `/predict` endpoint |
+| 6 | May 26 – Jun 1 | Streaming inference loop, backtesting replay engine, state management tests |
+| 7 | Jun 2 – Jun 8 | Streamlit dashboard (calls FastAPI), stability smoothing, ablation study |
+| 8 | Jun 9 – Jun 15 | Final metrics report, README polish, demo video |
 | **Final** | **Jun 16 – Jun 17** | **Documentation polish, final README, submission ✅** |
 
 ---
@@ -363,4 +395,4 @@ ETA labels are derived from the data itself: the timestamp of the final ping of 
 
 ---
 
-*Last updated: 2026-04-27 — Final submission deadline: June 17, 2026*
+*Last updated: 2026-05-04 — Final submission deadline: June 17, 2026*
