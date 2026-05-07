@@ -21,6 +21,9 @@ htmlcov/
 .vscode/
 .idea/
 
+# Data files
+*.csv
+
 # OS files
 .DS_Store
 Thumbs.db
