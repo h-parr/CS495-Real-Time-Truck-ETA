@@ -111,6 +111,8 @@ Implementation notes:
 ### Categorical Encoding Plan (One-Hot Encoding)
 Current model mostly uses numeric features. If categorical fields like `Device_Type` or `Source` are available and stable, encode them as follows:
 
+**One-hot encoding definition:** one-hot encoding converts one categorical column into multiple binary columns (0/1), one per category value. For example, `trip_category` with values `{short, medium, long}` becomes three columns: `trip_category_short`, `trip_category_medium`, `trip_category_long`. Each row has exactly one `1` and the rest `0`.
+
 - One-hot encode low-cardinality categories (`Device_Type`, `Source`) during training.
 - Persist category vocabulary with the model so train/inference schemas match.
 - Add unknown bucket handling for unseen categories in production.
@@ -176,6 +178,8 @@ This section is exploratory design only (not a committed build target yet).
 
 This section is feasibility analysis only. Google API integration is an optional idea for calibration, not a dependency for core project completion.
 
+> Guidance note: all limits, pricing references, and ping calculations below are planning estimates and example scenarios. Treat them as directional guidance, not a fixed implementation commitment.
+
 ### Recommended API choice
 - Prefer Routes API (`ComputeRoutes`) over Distance Matrix (Legacy).
 - Reason: Distance Matrix endpoint is in Legacy status and should not be the long-term integration path.
@@ -188,6 +192,24 @@ From Google documentation (checked 2026-05-06):
 
 This means a hard throughput ceiling of:
 - 3,000 requests/minute = 50 requests/second if every ping hits Google.
+
+### Free vs paid usage (in ping terms)
+
+Assumption for this table: `1 ping -> 1 Google ComputeRoutes request`.
+
+These values are shown as possible planning scenarios only.
+
+| Scenario | Included/allowed calls | Equivalent pings/month (if 1 ping = 1 request) | Notes |
+|---|---:|---:|---|
+| New account trial credit | `$300` credit (not a fixed call count) | depends on SKU price | Converts to calls based on active SKU pricing |
+| Subscription: Starter plan | `50,000` monthly calls (plan total) | up to `50,000` pings/month | Routes coverage in Starter can vary by included products; verify in console before relying on this for Routes |
+| Subscription: Essentials plan | `100,000` monthly calls | up to `100,000` pings/month | Includes Routes products per current pricing page |
+| Subscription: Pro plan | `250,000` monthly calls | up to `250,000` pings/month | Includes Routes products per current pricing page |
+| No free calls left (pay-as-you-go) | No monthly free bucket | unlimited by budget, billed per request/element | Still constrained by quota: 3,000 QPM (ComputeRoutes), 3,000 EPM (RouteMatrix) |
+
+Operational interpretation:
+- "How many pings for free" = the included monthly call bucket for your active plan/SKU.
+- "How many without free" = as many as you are willing to pay for, but never above minute-level quota limits.
 
 ### How many pings can we use?
 If you call Google on every ping, max fleet throughput is approximately:
@@ -212,6 +234,63 @@ Google pricing pages now include plan-based and SKU-based billing that can chang
 Rule-of-thumb viability:
 - Viable for this project if Google calls are throttled to <= 10% to 20% of pings.
 - Not viable at scale if every ping triggers a route call.
+
+### Google API request examples and exact use cases
+
+The request payloads below are example patterns to communicate possible integration ideas.
+
+Use case A (single truck ETA refresh every 5 to 15 minutes): `ComputeRoutes`
+
+```http
+POST https://routes.googleapis.com/directions/v2:computeRoutes
+X-Goog-Api-Key: YOUR_API_KEY
+X-Goog-FieldMask: routes.duration,routes.distanceMeters
+Content-Type: application/json
+
+{
+  "origin": {
+    "location": {
+      "latLng": {"latitude": 41.8781, "longitude": -87.6298}
+    }
+  },
+  "destination": {
+    "location": {
+      "latLng": {"latitude": 39.7392, "longitude": -104.9903}
+    }
+  },
+  "travelMode": "DRIVE",
+  "routingPreference": "TRAFFIC_AWARE"
+}
+```
+
+How it is used in this project:
+- Read `routes.duration` as traffic-aware route ETA.
+- Blend with model ETA (`P50`) instead of replacing model output.
+
+Use case B (fleet dispatch board, many trucks to one depot): `ComputeRouteMatrix`
+
+```http
+POST https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix
+X-Goog-Api-Key: YOUR_API_KEY
+X-Goog-FieldMask: originIndex,destinationIndex,duration,distanceMeters,status
+Content-Type: application/json
+
+{
+  "origins": [
+    {"waypoint": {"location": {"latLng": {"latitude": 41.88, "longitude": -87.63}}}},
+    {"waypoint": {"location": {"latLng": {"latitude": 41.50, "longitude": -88.10}}}}
+  ],
+  "destinations": [
+    {"waypoint": {"location": {"latLng": {"latitude": 39.7392, "longitude": -104.9903}}}}
+  ],
+  "travelMode": "DRIVE",
+  "routingPreference": "TRAFFIC_AWARE"
+}
+```
+
+How it is used in this project:
+- Batch-update ETA priors for multiple active trucks.
+- Keep per-ping prediction local in the ML model; refresh matrix calls at lower cadence to control cost.
 
 ## 6) Runnable Artifacts Added
 
