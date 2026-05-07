@@ -180,6 +180,12 @@ This section is feasibility analysis only. Google API integration is an optional
 
 > Guidance note: all limits, pricing references, and ping calculations below are planning estimates and example scenarios. Treat them as directional guidance, not a fixed implementation commitment.
 
+### Official reference links
+- Google Maps Platform pricing overview: https://mapsplatform.google.com/pricing/
+- Routes API usage and billing (includes request quotas): https://developers.google.com/maps/documentation/routes/usage-and-billing
+- Routes API usage limits anchor (directly to quota section): https://developers.google.com/maps/documentation/routes/usage-and-billing#usage-limits
+- Distance Matrix (Legacy) usage and billing (for comparison): https://developers.google.com/maps/documentation/distance-matrix/usage-and-billing
+
 ### Recommended API choice
 - Prefer Routes API (`ComputeRoutes`) over Distance Matrix (Legacy).
 - Reason: Distance Matrix endpoint is in Legacy status and should not be the long-term integration path.
