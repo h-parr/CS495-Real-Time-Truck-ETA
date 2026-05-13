@@ -47,6 +47,8 @@ def evaluate(
     p50: np.ndarray,
     p10: np.ndarray | None = None,
     p90: np.ndarray | None = None,
+    near_arrival_threshold_min: float = 60.0,
+    tolerance_min: float = 10.0,
 ) -> dict[str, float]:
     """Compute a full evaluation report.
 
@@ -58,6 +60,11 @@ def evaluate(
         Median (P50) predictions.
     p10, p90 : array-like, optional
         Lower and upper quantile predictions for coverage/pinball.
+    near_arrival_threshold_min : float, default 60.0
+        Rows with ``y_true <= near_arrival_threshold_min`` are treated as
+        near-arrival rows for operational metrics.
+    tolerance_min : float, default 10.0
+        Absolute-error tolerance (in minutes) for within-tolerance rate.
 
     Returns
     -------
@@ -71,6 +78,16 @@ def evaluate(
         "rmse": rmse(y_true, p50),
         "mape": mape(y_true, p50),
     }
+
+    near_mask = y_true <= near_arrival_threshold_min
+    report["near_arrival_n"] = float(np.sum(near_mask))
+    if near_mask.any():
+        near_abs_err = np.abs(y_true[near_mask] - p50[near_mask])
+        report["near_arrival_mae"] = float(np.mean(near_abs_err))
+        report["within_tolerance_rate"] = float(np.mean(near_abs_err <= tolerance_min))
+    else:
+        report["near_arrival_mae"] = float("nan")
+        report["within_tolerance_rate"] = float("nan")
 
     if p10 is not None:
         p10 = np.asarray(p10, dtype=np.float64)

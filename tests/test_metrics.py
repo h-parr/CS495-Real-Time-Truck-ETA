@@ -74,3 +74,15 @@ class TestEvaluate:
         p90 = y + 5
         report = evaluate(y, p50, p10, p90)
         assert report["coverage_p10_p90"] == 1.0
+
+    def test_near_arrival_metrics(self):
+        y = np.array([5.0, 20.0, 80.0])
+        p50 = np.array([7.0, 35.0, 100.0])
+        report = evaluate(y, p50, near_arrival_threshold_min=60.0, tolerance_min=10.0)
+
+        # Near-arrival rows are first two only.
+        # Absolute errors: [2, 15] -> near-arrival MAE = 8.5
+        # Within-10 rate: [True, False] -> 0.5
+        assert report["near_arrival_n"] == 2.0
+        assert report["near_arrival_mae"] == pytest.approx(8.5)
+        assert report["within_tolerance_rate"] == pytest.approx(0.5)

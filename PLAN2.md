@@ -1,6 +1,6 @@
 # PLAN2.md
 
-## Real-Time Truck ETA Next Steps (as of 2026-05-06)
+## Real-Time Truck ETA Next Steps (as of 2026-05-13)
 
 This document focuses on the immediate next implementation steps after the current baseline pipeline.
 
@@ -20,35 +20,34 @@ Infer whether the truck is likely loaded or unloaded during a trip, then inject 
 
 ### Deliverables
 - Create `src/load_state.py`.
-- Implement change point detection on per-trip speed signal:
-  - PELT (primary).
-  - Binary Segmentation (comparison baseline).
+- Implement load-state detection on per-trip speed signal:
+  - Rolling-mean heuristic (primary production method).
+  - PELT and Binary Segmentation (optional comparison baselines).
 - Use `Weight_lbs` (when available) as weak ground truth for event alignment.
 - Output per-ping state label: `loaded`, `unloaded`, `unknown`.
 - Create derived feature: `load_change_count` per trip.
 - Integrate into feature builder and model training.
 
-### What are PELT and BinSeg?
-- **PELT (Pruned Exact Linear Time)**: a change-point detection algorithm that finds breakpoints in a time series by minimizing a total objective:
-  - `total_cost = fit_error_within_segments + penalty_per_change * number_of_changes`
-  In plain terms, it searches for the best set of regime changes (for example, unloaded vs loaded driving behavior) while penalizing too many breakpoints so it does not overfit noise.
-- **BinSeg (Binary Segmentation)**: a greedy change-point method that repeatedly splits the signal at the strongest detected breakpoint, then recurses on each segment. It is usually faster and simpler, but can be less globally optimal than PELT.
-- **How this helps ETA**: both methods can identify behavior shifts in speed patterns that may correspond to load/unload events, traffic regime changes, or stop-go phases.
+### Primary algorithm: rolling-mean heuristic
+- Build a per-trip 1D speed signal.
+- Apply centered rolling mean smoothing (window = 3 pings).
+- Classify each ping:
+  - smoothed speed < 10 mph -> `loaded` (1)
+  - smoothed speed >= 10 mph -> `unloaded` (0)
+- Count transitions to create `load_change_count`.
 
-#### How PELT works (simple view)
-1. Build a 1D signal per trip (start with speed, optionally add acceleration).
-2. Choose a segment cost (for example, piecewise-constant mean or variance change).
-3. Sweep forward through the series and compute the best segmentation up to each time index using dynamic programming.
-4. Prune candidate breakpoints that cannot be optimal later (this is the "pruned" part that makes it efficient).
-5. Return the final set of change points and map segments to states (`loaded`, `unloaded`, `unknown`).
+Why this is primary:
+- Very fast on large datasets.
+- Robust to per-ping speed noise.
+- Captures regime changes needed by ETA models without expensive global optimization.
 
-Practical tuning notes:
-- Higher penalty -> fewer change points (more conservative, less sensitive).
-- Lower penalty -> more change points (more sensitive, higher false-positive risk).
-- Tune penalty against `Weight_lbs`-aligned events and report both F1 and detection lag.
+### Optional CPD methods (for analysis)
+- **PELT (Pruned Exact Linear Time)**: globally optimized change-point detection with penalty tuning.
+- **BinSeg (Binary Segmentation)**: greedy, usually faster CPD baseline.
+- Use these methods for offline comparison against the heuristic when evaluating event alignment quality.
 
 ### Evaluation
-- Compare PELT vs BinSeg with:
+- Compare heuristic vs CPD methods with:
   - Event F1 score.
   - Median detection lag (pings from true event).
 - Add tests for edge cases:
@@ -349,7 +348,7 @@ python src/ping_viability_estimator.py --trucks 250 --ping-interval-sec 30 --act
 
 ## 7) Implementation Order (Recommended)
 
-1. Build `src/load_state.py` with PELT + BinSeg and tests.
+1. Build `src/load_state.py` with heuristic-first load-state detection, plus optional PELT/BinSeg comparison tests.
 2. Add new engineered features (especially acceleration and duration estimate).
 3. Introduce one-hot encoding pipeline for categorical telematics fields.
 4. Retrain and compare HGB vs LightGBM vs XGBoost.

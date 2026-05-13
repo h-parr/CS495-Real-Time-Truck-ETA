@@ -40,7 +40,7 @@ def load_raw(csv_path: str | Path) -> pd.DataFrame:
 
 
 def segment_trips(df: pd.DataFrame) -> pd.DataFrame:
-    """Assign a ``TripId`` to every row based on time gaps and speed.
+    """Assign a ``trip_id`` to every row based on time gaps and speed.
 
     Algorithm
     ---------
@@ -76,10 +76,10 @@ def segment_trips(df: pd.DataFrame) -> pd.DataFrame:
             tid = f"{vin}_{trip_counter:04d}"
             trip_ids.extend([tid] * len(sub))
 
-    df["TripId"] = trip_ids
+    df["trip_id"] = trip_ids
 
     # Filter short trips
-    trip_sizes = df.groupby("TripId")["TripId"].transform("count")
+    trip_sizes = df.groupby("trip_id")["trip_id"].transform("count")
     df = df[trip_sizes >= MIN_TRIP_PINGS].reset_index(drop=True)
 
     return df
@@ -91,7 +91,7 @@ def main(input_csv: str | Path, output_csv: str | Path) -> None:
     print(f"Loaded {len(df):,} rows, {df['VIN'].nunique()} VINs")
 
     df = segment_trips(df)
-    n_trips = df["TripId"].nunique()
+    n_trips = df["trip_id"].nunique()
     print(f"Segmented into {n_trips:,} trips ({len(df):,} rows kept)")
 
     Path(output_csv).parent.mkdir(parents=True, exist_ok=True)

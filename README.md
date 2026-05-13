@@ -17,6 +17,31 @@ Using telematics to build a real-time model and streaming service to predict est
 
 • Backtesting: Replay historical trip streams, evaluate stability smoothing, and ablation study
 
+# Load State Detection (Phase 2b)
+
+The project now uses a heuristic load-state algorithm as the primary production path.
+
+## Primary algorithm (used in training)
+
+- Method: centered rolling mean over per-trip speed (window = 3 pings).
+- Rule: if smoothed speed < 10 mph, classify ping as loaded (`1`); otherwise unloaded (`0`).
+- Derived feature: `load_change_count` counts loaded/unloaded transitions within a trip.
+
+How it works, step by step:
+1. Sort pings by `trip_id` and `Timestamp`.
+2. Smooth noisy speed with a rolling mean.
+3. Convert each ping into a binary state using the 10 mph threshold.
+4. Count state transitions per trip and attach both features to the model row set.
+
+Why this method is primary:
+- It is much faster on large datasets than full change-point optimization.
+- It preserves useful regime-shift signal for ETA modeling.
+
+## Optional comparison methods
+
+- PELT and Binary Segmentation are still implemented in `src/load_state.py` for offline CPD comparison/analysis.
+- The feature pipeline defaults to heuristic mode for runtime practicality.
+
 # Dataset
 
 The `data/sample_trucks_dataset.csv` file contains real-time telematics records used for model training and evaluation. Each row represents a single telemetry ping from a truck. The tracked variables are described below:
@@ -75,6 +100,36 @@ make rebuild   # clean + install
 ```bash
 make freeze    # write currently installed packages to requirements.txt
 ```
+
+# Interactive Demo
+
+A **Streamlit demo app** is included to visualize ETA predictions on sample truck trips:
+
+```bash
+streamlit run demo_app.py
+```
+
+## Features
+
+- **🗺️ Animated Trip Map**: Watch the truck route with live position marker, detected stops, and planned route
+- **📊 Speed & Weight Profiles**: Time-series charts showing speed changes, stops, and load variations
+- **📍 ETA Confidence Intervals**: Quantile regression predictions (P10/P50/P90) showing 80% confidence band
+- **🛑 Stop Detection**: Automatic detection and visualization of stops > 1 minute duration
+- **📈 Real-time Metrics**: Distance traveled, remaining distance, average speed, load info
+- **⏱️ Timeline Navigation**: Scrub through the trip to see how ETA predictions evolve
+
+## Models Used
+
+The demo uses pre-trained LightGBM quantile regressors:
+- `lgb_q10.pkl`: 10th percentile (optimistic ETA)
+- `lgb_q50.pkl`: Median / best estimate
+- `lgb_q90.pkl`: 90th percentile (conservative ETA)
+
+## Data Requirements
+
+The demo requires:
+- `data/segmented_trips.csv`: Pre-processed trip data with 4.9M telemetry pings
+- `models/*.pkl`: Pre-trained model artifacts from `make train`
 
 # Development Workflow
 

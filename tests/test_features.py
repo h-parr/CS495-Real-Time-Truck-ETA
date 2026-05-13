@@ -19,7 +19,7 @@ from src.features import (
 def _trip_df(n: int = 10) -> pd.DataFrame:
     """Minimal trip DataFrame for testing."""
     return pd.DataFrame({
-        "TripId": "T1",
+        "trip_id": "T1",
         "Timestamp": pd.date_range("2026-04-01 08:00", periods=n, freq="min"),
         "Latitude": np.linspace(40.0, 40.1, n),
         "Longitude": np.linspace(-74.0, -73.9, n),

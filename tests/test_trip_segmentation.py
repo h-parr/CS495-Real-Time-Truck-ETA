@@ -24,7 +24,7 @@ class TestSegmentTrips:
         df = _make_pings("VIN_A", ts, speeds)
         out = segment_trips(df)
 
-        assert out["TripId"].nunique() == 1
+        assert out["trip_id"].nunique() == 1
         assert len(out) == 10
 
     def test_time_gap_splits_trip(self):
@@ -35,7 +35,7 @@ class TestSegmentTrips:
         df = _make_pings("VIN_B", ts, speeds)
         out = segment_trips(df)
 
-        assert out["TripId"].nunique() == 2
+        assert out["trip_id"].nunique() == 2
 
     def test_short_trip_filtered(self):
         """Trips with fewer than MIN_TRIP_PINGS pings are dropped."""
@@ -50,7 +50,7 @@ class TestSegmentTrips:
         ], ignore_index=True).sort_values(["VIN", "Timestamp"]).reset_index(drop=True)
 
         out = segment_trips(df)
-        assert out["TripId"].nunique() == 1
+        assert out["trip_id"].nunique() == 1
         assert len(out) == MIN_TRIP_PINGS + 5
 
     def test_multiple_vins(self):
@@ -63,6 +63,6 @@ class TestSegmentTrips:
         ], ignore_index=True)
         out = segment_trips(df)
 
-        assert out["TripId"].nunique() == 2
-        assert all("VIN_X" in tid for tid in out[out["VIN"] == "VIN_X"]["TripId"])
-        assert all("VIN_Y" in tid for tid in out[out["VIN"] == "VIN_Y"]["TripId"])
+        assert out["trip_id"].nunique() == 2
+        assert all("VIN_X" in tid for tid in out[out["VIN"] == "VIN_X"]["trip_id"])
+        assert all("VIN_Y" in tid for tid in out[out["VIN"] == "VIN_Y"]["trip_id"])

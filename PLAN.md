@@ -11,7 +11,7 @@
 **Author:** Harri  
 **Course:** CS 495 — Capstone Project  
 **Date:** April 27, 2026  
-**Last Updated:** May 4, 2026
+**Last Updated:** May 13, 2026
 
 ### Description
 
@@ -24,7 +24,7 @@ A machine learning pipeline that ingests raw **GPS/telematics** pings from comme
 - Deliver calibrated uncertainty: ≥ 80% of actual arrivals fall inside the P10–P90 interval
 - Build a streaming inference loop that updates ETA at every telemetry ping per (VIN, TripId)
 - Backtest the model on replayed historical trip streams and demonstrate stable predictions
-- Compare change point detection methods (PELT vs Binary Segmentation) for load/unload detection and select the best-performing approach
+- Use heuristic load-state detection for production and compare optional CPD methods (PELT/Binary Segmentation) offline
 - Deploy an interactive Streamlit dashboard showing live ETA and confidence band on a map
 - Expose a REST API endpoint (FastAPI) so external logistics systems can query ETA predictions in real time
 
@@ -33,9 +33,10 @@ A machine learning pipeline that ingests raw **GPS/telematics** pings from comme
 ## Success Criteria
 
 - ETA model performance: final P50 model MAE < 10 minutes on the held-out test set
+- Operational ETA goal: for near-arrival predictions (true ETA <= 60 minutes), achieve MAE <= 10 minutes and track % of predictions within +/-10 minutes error
 - Baseline comparison: final P50 model improves MAE by at least 10% vs HistGradientBoostingRegressor baseline
 - Uncertainty calibration: at least 80% of true arrivals fall inside the P10-P90 prediction interval
-- CPD comparison: choose between PELT and Binary Segmentation using better F1 score on known load/unload events
+- Load-state evaluation: compare heuristic vs optional CPD methods using better F1 score on known load/unload events
 - CPD latency: median detection lag <= 3 pings after a true load/unload event
 - Reliability: all core pipeline tests pass in pytest and lint checks pass with ruff
 - API: FastAPI endpoint returns P10/P50/P90 ETA response in < 50ms per ping
@@ -215,16 +216,16 @@ raw telemetry CSV
   - [x] Trip progress fraction (0→1)
 - [x] Write unit tests for all feature transforms (14 tests passing)
 
-### Phase 2b — Load State Detection (Change Point Detection) 🔲
-- [ ] Create `load_state.py` — change point detection module
-  - [ ] Apply PELT algorithm (via `ruptures`) to per-trip speed signal to detect load/unload events
-      - [ ] Apply Binary Segmentation (via `ruptures`) as a comparison CPD method on the same trips
-  - [ ] Use `Weight_lbs` readings (where available) as ground-truth labels to validate detected change points
-  - [ ] Emit a `LoadState` label per ping: `loaded`, `unloaded`, or `unknown`
-  - [ ] Derive `load_change_count` feature (number of state transitions per trip)
-  - [ ] Add `LoadState` and `load_change_count` as features in `features.py`
-- [ ] Evaluate CPD accuracy against known weight events and compare PELT vs Binary Segmentation (F1 and detection lag)
-- [ ] Write unit tests for change point detection edge cases (flat signal, single ping, no weight data)
+### Phase 2b — Load State Detection (Change Point Detection) ✅
+- [x] Create `load_state.py` — change point detection module
+      - [x] Apply rolling-mean speed heuristic as the primary load/unload detector for production runs
+      - [x] Keep PELT and Binary Segmentation (via `ruptures`) available as optional CPD comparison methods
+  - [x] Use `Weight_lbs` readings (where available) as ground-truth labels to validate detected change points
+  - [x] Emit a `LoadState` label per ping: `loaded`, `unloaded`, or `unknown`
+  - [x] Derive `load_change_count` feature (number of state transitions per trip)
+  - [x] Add `LoadState` and `load_change_count` as features in `features.py`
+- [x] Evaluate load-state accuracy against known weight events and compare heuristic vs CPD methods (F1 and detection lag)
+- [x] Write unit tests for change point detection edge cases (flat signal, single ping, no weight data) — 35 tests passing
 
 ### Phase 3 — Modeling �
 - [x] Train/validation/test split (trip-level, not row-level, to prevent leakage)
@@ -285,20 +286,20 @@ Root cause of LightGBM underperforming HGB: objective mismatch (pinball vs squar
 - `pandas` for data loading and manipulation
 - `pyarrow` for fast CSV / parquet I/O
 - Custom trip segmentation using time-gap and speed thresholds
-- `ruptures` for PELT change point detection (load state inference)
+- Heuristic rolling-mean load-state inference as default; `ruptures`-based CPD kept for comparison
 - `scikit-learn` preprocessing: `StandardScaler`, `OrdinalEncoder`
 
 ### Load State Detection
 
-Since `Weight_lbs` is sparse and event-driven (not present on every ping), a change point detection (CPD) algorithm is used to infer truck load state from the speed signal instead.
+Since `Weight_lbs` is sparse and event-driven (not present on every ping), a speed-based heuristic is used to infer truck load state in production, with CPD methods retained for offline comparison.
 
-- **Algorithm:** PELT (Pruned Exact Linear Time) — detects structural breaks in a time series with optimal cost minimization
-- **Comparison method:** Binary Segmentation (BinSeg) — faster greedy CPD baseline to benchmark against PELT
-- **Signal:** per-trip speed sequence (and optionally acceleration derived from consecutive pings)
-- **Validation:** when `Weight_lbs` readings are present, use them as ground-truth to tune the penalty parameter
+- **Primary algorithm:** rolling-mean speed heuristic (window=3) with 10 mph threshold
+- **Rule:** if smoothed speed < 10 mph -> `loaded`; otherwise -> `unloaded`
+- **Derived feature:** `load_change_count` = number of loaded/unloaded transitions per trip
+- **Optional comparison methods:** PELT and Binary Segmentation (BinSeg) for offline CPD benchmarking
+- **Signal:** per-trip speed sequence (optionally acceleration in extended experiments)
+- **Validation:** compare inferred states against `Weight_lbs` events where available
 - **Output:** `LoadState` label (`loaded` / `unloaded` / `unknown`) per ping, plus `load_change_count` per trip
-- **Library:** `ruptures` (Python change point detection library)
-- **Fallback:** if speed signal is too flat or trip is too short, default to `unknown`
 
 ### Machine Learning Models
 
@@ -313,6 +314,8 @@ Since `Weight_lbs` is sparse and event-driven (not present on every ping), a cha
 ### Evaluation Metrics
 
 - **MAE** — Mean Absolute Error on P50 (primary point estimate)
+- **Near-Arrival MAE (ETA <= 60 min)** — Operational MAE that aligns with dispatch expectations
+- **Within-10-Min Rate (ETA <= 60 min)** — % of predictions with absolute error <= 10 minutes
 - **RMSE** — Root Mean Squared Error
 - **MAPE** — Mean Absolute Percentage Error
 - **Pinball Loss** — Quantile loss at P10 and P90
@@ -376,8 +379,8 @@ ETA labels are derived from the data itself: the timestamp of the final ping of 
 |---|---|---|
 | 1 | Apr 21 – Apr 27 | Data audit ✅, repo setup ✅ |
 | 2 | Apr 28 – May 4 | Trip segmentation ✅, feature engineering ✅, first model run ✅, baselines ✅ |
-| 3 | May 5 – May 11 | Load state detection (`load_state.py` — PELT CPD), acceleration + trip-length features, relax early stopping |
-| 4 | May 12 – May 18 | CPD comparison (PELT vs BinSeg), validate against weight readings; integrate `LoadState` into feature set |
+| 3 | May 5 – May 11 | Load state detection (`load_state.py` — heuristic primary), acceleration + trip-length features, relax early stopping |
+| 4 | May 12 – May 18 | Optional CPD comparison (PELT vs BinSeg), validate against weight readings; integrate `LoadState` into feature set |
 | 5 | May 19 – May 25 | XGBoost comparison, hyperparameter tuning, full evaluation; FastAPI `/predict` endpoint |
 | 6 | May 26 – Jun 1 | Streaming inference loop, backtesting replay engine, state management tests |
 | 7 | Jun 2 – Jun 8 | Streamlit dashboard (calls FastAPI), stability smoothing, ablation study |
@@ -395,4 +398,4 @@ ETA labels are derived from the data itself: the timestamp of the final ping of 
 
 ---
 
-*Last updated: 2026-05-04 — Final submission deadline: June 17, 2026*
+*Last updated: 2026-05-13 — Final submission deadline: June 17, 2026*
